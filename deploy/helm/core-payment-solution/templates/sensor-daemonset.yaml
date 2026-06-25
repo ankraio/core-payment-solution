@@ -1,0 +1,58 @@
+{{- if .Values.sensor.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "core-payment-solution.fullname" . }}-sensor
+  labels:
+    {{- include "core-payment-solution.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sensor
+spec:
+  selector:
+    matchLabels:
+      {{- include "core-payment-solution.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: sensor
+  template:
+    metadata:
+      labels:
+        {{- include "core-payment-solution.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: sensor
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      serviceAccountName: {{ include "core-payment-solution.serviceAccountName" . }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: sensor
+          image: {{ include "core-payment-solution.sensorImage" . }}
+          imagePullPolicy: {{ .Values.sensorImage.pullPolicy }}
+          env:
+            - name: COLLECTOR_URL
+              value: {{ include "core-payment-solution.collectorURL" . | quote }}
+            - name: SENSOR_INTERFACE
+              value: {{ .Values.sensor.interface | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.commonEnv.logLevel | quote }}
+          securityContext:
+            privileged: true
+            capabilities:
+              add:
+                - NET_RAW
+                - NET_ADMIN
+          resources:
+            {{- toYaml .Values.sensor.resources | nindent 12 }}
+      {{- with .Values.sensor.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sensor.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sensor.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

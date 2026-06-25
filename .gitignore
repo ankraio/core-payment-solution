@@ -1,0 +1,12 @@
+/bin/
+/collector
+/ssh-emu
+/certs/
+/dist/
+err.txt
+*.db
+*.db-wal
+*.db-shm
+.env
+/var/
+*.log

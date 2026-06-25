@@ -1,0 +1,87 @@
+# Linux-only override: switch trap services to host networking so emulators
+# observe the real attacker source IP (bridge networking SNATs to the gateway
+# and collapses every attacker into one identity).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.linux.yml up -d
+#   docker compose -f docker-compose.yml -f docker-compose.linux.yml --profile tier2 up -d
+#
+# With host networking each service binds its port directly on the host, so make
+# sure nothing else is already listening on 2222, 8080, 8000, 8443, 8081, 6379,
+# 6443, 8009, 10250, 2379, 9400, 9500. Environment maps are deep-merged with the
+# base file; `networks: !reset null` drops the base bridge attachment so it does
+# not conflict with host networking.
+
+services:
+  collector:
+    network_mode: host
+    networks: !reset null
+
+  ssh-emu:
+    network_mode: host
+    networks: !reset null
+    environment:
+      COLLECTOR_URL: "http://127.0.0.1:9400"
+      LISTEN_ADDRESS: ":2222"
+
+  tomcat-emu:
+    network_mode: host
+    networks: !reset null
+    environment:
+      COLLECTOR_URL: "http://127.0.0.1:9400"
+      LISTEN_ADDRESS: ":8080"
+
+  jdwp-emu:
+    network_mode: host
+    networks: !reset null
+    environment:
+      COLLECTOR_URL: "http://127.0.0.1:9400"
+      LISTEN_ADDRESS: ":8000"
+
+  payments-api-emu:
+    network_mode: host
+    networks: !reset null
+    environment:
+      COLLECTOR_URL: "http://127.0.0.1:9400"
+      LISTEN_ADDRESS: ":8443"
+
+  admin-portal-emu:
+    network_mode: host
+    networks: !reset null
+    environment:
+      COLLECTOR_URL: "http://127.0.0.1:9400"
+      LISTEN_ADDRESS: ":8081"
+
+  redis-emu:
+    network_mode: host
+    networks: !reset null
+    environment:
+      COLLECTOR_URL: "http://127.0.0.1:9400"
+      LISTEN_ADDRESS: ":6379"
+
+  k8s-emu:
+    network_mode: host
+    networks: !reset null
+    environment:
+      COLLECTOR_URL: "http://127.0.0.1:9400"
+      LISTEN_ADDRESS: ":6443"
+
+  ajp-emu:
+    network_mode: host
+    networks: !reset null
+    environment:
+      COLLECTOR_URL: "http://127.0.0.1:9400"
+      LISTEN_ADDRESS: ":8009"
+
+  kubelet-emu:
+    network_mode: host
+    networks: !reset null
+    environment:
+      COLLECTOR_URL: "http://127.0.0.1:9400"
+      LISTEN_ADDRESS: ":10250"
+
+  etcd-emu:
+    network_mode: host
+    networks: !reset null
+    environment:
+      COLLECTOR_URL: "http://127.0.0.1:9400"
+      LISTEN_ADDRESS: ":2379"

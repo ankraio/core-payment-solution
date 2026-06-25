@@ -1,0 +1,18 @@
+{{- if .Values.collector.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "core-payment-solution.fullname" . }}-collector
+  labels:
+    {{- include "core-payment-solution.labels" . | nindent 4 }}
+    app.kubernetes.io/component: collector
+spec:
+  accessModes:
+    - {{ .Values.collector.persistence.accessMode }}
+  {{- if .Values.collector.persistence.storageClass }}
+  storageClassName: {{ .Values.collector.persistence.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.collector.persistence.size }}
+{{- end }}

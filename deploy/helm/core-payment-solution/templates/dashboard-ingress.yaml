@@ -1,0 +1,36 @@
+{{- if .Values.collector.dashboard.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "core-payment-solution.fullname" . }}-dashboard
+  labels:
+    {{- include "core-payment-solution.labels" . | nindent 4 }}
+    app.kubernetes.io/component: collector
+  {{- with .Values.collector.dashboard.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.collector.dashboard.ingress.className }}
+  ingressClassName: {{ .Values.collector.dashboard.ingress.className }}
+  {{- end }}
+  {{- if .Values.collector.dashboard.ingress.tls }}
+  tls:
+    {{- toYaml .Values.collector.dashboard.ingress.tls | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.collector.dashboard.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "core-payment-solution.fullname" $ }}-dashboard
+                port:
+                  number: {{ $.Values.collector.dashboard.service.port }}
+          {{- end }}
+    {{- end }}
+{{- end }}

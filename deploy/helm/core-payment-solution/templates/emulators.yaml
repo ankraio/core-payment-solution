@@ -1,0 +1,81 @@
+{{- range $name, $emulator := .Values.emulators }}
+{{- if eq (include "core-payment-solution.emulatorEnabled" (dict "emulator" $emulator "Values" $.Values)) "true" }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "core-payment-solution.fullname" $ }}-{{ $name }}
+  labels:
+    {{- include "core-payment-solution.emulatorLabels" (dict "root" $ "name" $name) | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "core-payment-solution.emulatorSelectorLabels" (dict "root" $ "name" $name) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "core-payment-solution.emulatorSelectorLabels" (dict "root" $ "name" $name) | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "core-payment-solution.serviceAccountName" $ }}
+      {{- with $.Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml $.Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ $name }}
+          image: {{ include "core-payment-solution.image" $ }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          command: ["/app/{{ $emulator.binary }}"]
+          securityContext:
+            {{- toYaml $.Values.securityContext | nindent 12 }}
+          ports:
+            - name: trap
+              containerPort: {{ $emulator.port }}
+              protocol: TCP
+          env:
+            - name: COLLECTOR_URL
+              value: {{ include "core-payment-solution.collectorURL" $ | quote }}
+            - name: MACHINE
+              value: {{ $emulator.machine | quote }}
+            - name: LISTEN_ADDRESS
+              value: ":{{ $emulator.port }}"
+            - name: LOG_LEVEL
+              value: {{ $.Values.commonEnv.logLevel | quote }}
+            - name: CERT_DIRECTORY
+              value: {{ $.Values.commonEnv.certDirectory | quote }}
+            - name: TRUST_FORWARDED_FOR
+              value: {{ $.Values.commonEnv.trustForwardedFor | quote }}
+            - name: TRANSPORT_FLUSH_INTERVAL
+              value: {{ $.Values.commonEnv.transportFlushInterval | quote }}
+          resources: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "core-payment-solution.fullname" $ }}-{{ $name }}
+  labels:
+    {{- include "core-payment-solution.emulatorLabels" (dict "root" $ "name" $name) | nindent 4 }}
+  {{- with $emulator.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ $emulator.service.type }}
+  {{- if and (eq $emulator.service.type "LoadBalancer") $emulator.service.loadBalancerIP }}
+  loadBalancerIP: {{ $emulator.service.loadBalancerIP | quote }}
+  {{- end }}
+  {{- if eq $emulator.service.type "LoadBalancer" }}
+  externalTrafficPolicy: {{ $emulator.service.externalTrafficPolicy }}
+  {{- end }}
+  selector:
+    {{- include "core-payment-solution.emulatorSelectorLabels" (dict "root" $ "name" $name) | nindent 4 }}
+  ports:
+    - name: trap
+      port: {{ $emulator.service.port }}
+      targetPort: trap
+      protocol: TCP
+{{- end }}
+{{- end }}

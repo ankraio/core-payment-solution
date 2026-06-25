@@ -1,0 +1,46 @@
+Core Payment Solution honeypot has been deployed as {{ .Release.Name }}.
+
+Collector (internal):
+  Ingest:    {{ include "core-payment-solution.collectorURL" . }}
+  Dashboard: {{ include "core-payment-solution.fullname" . }}-dashboard:{{ .Values.collector.dashboard.service.port }}
+
+Operator dashboard access (ClusterIP — not exposed to attackers):
+  kubectl port-forward svc/{{ include "core-payment-solution.fullname" . }}-dashboard {{ .Values.collector.dashboard.service.port }}:{{ .Values.collector.dashboard.service.port }} -n {{ .Release.Namespace }}
+  open http://127.0.0.1:{{ .Values.collector.dashboard.service.port }}
+  Token: stored in secret {{ include "core-payment-solution.secretName" . }} key {{ include "core-payment-solution.dashboardSecretKey" . }}
+
+Slack notifications:
+{{- if .Values.notifications.slack.enabled }}
+{{- if .Values.notifications.slack.webhookUrl }}
+  Configured via chart-managed secret (webhook URL supplied at install).
+{{- else if .Values.secrets.existingSecret }}
+  Using existing secret {{ .Values.secrets.existingSecret }} key {{ include "core-payment-solution.slackSecretKey" . }}.
+{{- else }}
+  WARNING: notifications.slack.enabled is true but no webhook URL was provided.
+  Set notifications.slack.webhookUrl or secrets.existingSecret before alarms can fire.
+{{- end }}
+  Alarms and full intrusion route reports post to the configured Slack incoming webhook.
+{{- else }}
+  Disabled (notifications.slack.enabled=false).
+{{- end }}
+
+Trap services (LoadBalancer — point scanners at these):
+{{- range $name, $emulator := .Values.emulators }}
+{{- if eq (include "core-payment-solution.emulatorEnabled" (dict "emulator" $emulator "Values" $.Values)) "true" }}
+  {{ $name }}: {{ include "core-payment-solution.fullname" $ }}-{{ $name }}:{{ $emulator.service.port }} ({{ $emulator.machine }})
+{{- end }}
+{{- end }}
+
+Tier-2 emulators: {{ .Values.tier2.enabled }}
+Packet sensor:      {{ .Values.sensor.enabled }}
+
+Attribution note:
+  LoadBalancer services use externalTrafficPolicy=Local so node-level source IPs
+  are preserved when traffic hits the node that runs the pod. For Ingress-based
+  traps, set commonEnv.trustForwardedFor=true and terminate TLS at a proxy that
+  sets X-Forwarded-For.
+
+Install example with Slack webhook:
+  helm upgrade --install honeypot ./deploy/helm/core-payment-solution \
+    --set notifications.slack.webhookUrl=https://hooks.slack.com/services/... \
+    --set secrets.dashboardToken=change-me

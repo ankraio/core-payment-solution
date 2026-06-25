@@ -1,0 +1,42 @@
+collector:
+  ingest_address: ":9400"
+  dashboard_address: "127.0.0.1:9500"
+  data_directory: "/var/lib/honeypot"
+
+detection:
+  port_scan_window: "30s"
+  port_scan_distinct_ports: 6
+  brute_force_window: "60s"
+  brute_force_attempts: 5
+  lateral_movement_distinct_machines: 2
+  session_idle_timeout: "10m"
+
+alarm:
+  minimum_severity: "medium"
+  debounce_interval: "30s"
+  report_after_idle: "3m"
+
+slack:
+  enabled: true
+  webhook_env: "SLACK_WEBHOOK_URL"
+  channel: "#security-honeypot"
+  username: "core-payments-sentinel"
+
+deception:
+  organization_name: "Core Payment Solution"
+  fake_card_count: 250
+  fake_account_count: 80
+
+services:
+  - name: tomcat
+    machine: legacy-tomcat-01
+    banner: "Apache-Coyote/1.1"
+    version: "Apache Tomcat/9.0.30"
+  - name: payments-api
+    machine: payments-api-01
+    banner: "nginx/1.24.0"
+    version: "2.7.3"
+  - name: kube-apiserver
+    machine: k8s-control-01
+    banner: "kube-apiserver"
+    version: "v1.27.3"

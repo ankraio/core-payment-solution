@@ -1,0 +1,239 @@
+# Default values for core-payment-solution.
+# Install with your Slack webhook:
+#   helm upgrade --install honeypot ./deploy/helm/core-payment-solution \
+#     --set notifications.slack.webhookUrl='https://hooks.slack.com/services/...' \
+#     --set secrets.dashboardToken='your-operator-token'
+
+nameOverride: ""
+fullnameOverride: ""
+
+global:
+  imagePullSecrets: []
+
+image:
+  registry: ghcr.io
+  repository: ankraio/core-payment-solution
+  tag: ""
+  pullPolicy: IfNotPresent
+
+sensorImage:
+  registry: ghcr.io
+  repository: ankraio/core-payment-solution-sensor
+  tag: ""
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+commonEnv:
+  logLevel: info
+  trustForwardedFor: false
+  certDirectory: /tmp/certs
+  transportFlushInterval: 2s
+
+collector:
+  replicaCount: 1
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  persistence:
+    enabled: true
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 10Gi
+  service:
+    ingestPort: 9400
+    dashboardPort: 9500
+  dashboard:
+    service:
+      type: ClusterIP
+      port: 9500
+      annotations: {}
+    ingress:
+      enabled: false
+      className: ""
+      annotations: {}
+      hosts:
+        - host: honeypot-dashboard.local
+          paths:
+            - path: /
+              pathType: Prefix
+      tls: []
+
+notifications:
+  slack:
+    enabled: true
+    webhookUrl: ""
+    existingSecret: ""
+    existingSecretKey: webhook-url
+    channel: "#security-honeypot"
+    username: core-payments-sentinel
+
+secrets:
+  dashboardToken: ""
+  existingSecret: ""
+  existingSecretDashboardKey: dashboard-token
+
+config:
+  alarm:
+    minimumSeverity: medium
+    debounceInterval: 30s
+    reportAfterIdle: 3m
+  detection:
+    portScanWindow: 30s
+    portScanDistinctPorts: 6
+    bruteForceWindow: 60s
+    bruteForceAttempts: 5
+    lateralMovementMinimum: 2
+    sessionIdleTimeout: 10m
+
+emulators:
+  ssh:
+    enabled: true
+    tier: 1
+    binary: ssh-emu
+    machine: payments-api-01
+    port: 2222
+    service:
+      type: LoadBalancer
+      port: 2222
+      annotations: {}
+      loadBalancerIP: ""
+      externalTrafficPolicy: Local
+  tomcat:
+    enabled: true
+    tier: 1
+    binary: tomcat-emu
+    machine: legacy-tomcat-01
+    port: 8080
+    service:
+      type: LoadBalancer
+      port: 8080
+      annotations: {}
+      loadBalancerIP: ""
+      externalTrafficPolicy: Local
+  jdwp:
+    enabled: true
+    tier: 1
+    binary: jdwp-emu
+    machine: payments-api-01
+    port: 8000
+    service:
+      type: LoadBalancer
+      port: 8000
+      annotations: {}
+      loadBalancerIP: ""
+      externalTrafficPolicy: Local
+  payments-api:
+    enabled: true
+    tier: 1
+    binary: payments-api-emu
+    machine: payments-api-01
+    port: 8443
+    service:
+      type: LoadBalancer
+      port: 8443
+      annotations: {}
+      loadBalancerIP: ""
+      externalTrafficPolicy: Local
+  admin-portal:
+    enabled: true
+    tier: 1
+    binary: admin-portal-emu
+    machine: gateway-01
+    port: 8081
+    service:
+      type: LoadBalancer
+      port: 8081
+      annotations: {}
+      loadBalancerIP: ""
+      externalTrafficPolicy: Local
+  redis:
+    enabled: true
+    tier: 1
+    binary: redis-emu
+    machine: cache-01
+    port: 6379
+    service:
+      type: LoadBalancer
+      port: 6379
+      annotations: {}
+      loadBalancerIP: ""
+      externalTrafficPolicy: Local
+  k8s:
+    enabled: true
+    tier: 1
+    binary: k8s-emu
+    machine: k8s-control-01
+    port: 6443
+    service:
+      type: LoadBalancer
+      port: 6443
+      annotations: {}
+      loadBalancerIP: ""
+      externalTrafficPolicy: Local
+  ajp:
+    enabled: false
+    tier: 2
+    binary: ajp-emu
+    machine: legacy-tomcat-01
+    port: 8009
+    service:
+      type: LoadBalancer
+      port: 8009
+      annotations: {}
+      loadBalancerIP: ""
+      externalTrafficPolicy: Local
+  kubelet:
+    enabled: false
+    tier: 2
+    binary: kubelet-emu
+    machine: k8s-worker-01
+    port: 10250
+    service:
+      type: LoadBalancer
+      port: 10250
+      annotations: {}
+      loadBalancerIP: ""
+      externalTrafficPolicy: Local
+  etcd:
+    enabled: false
+    tier: 2
+    binary: etcd-emu
+    machine: k8s-control-01
+    port: 2379
+    service:
+      type: LoadBalancer
+      port: 2379
+      annotations: {}
+      loadBalancerIP: ""
+      externalTrafficPolicy: Local
+
+tier2:
+  enabled: false
+
+sensor:
+  enabled: false
+  interface: eth0
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+networkPolicy:
+  enabled: false

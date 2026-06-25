@@ -1,0 +1,13 @@
+.git
+.github
+deploy
+*.md
+.env
+.env.*
+certs/
+*.db
+err.txt
+scripts/smoke-test.sh
+scripts/egress-firewall.sh
+docker-compose*.yml
+Makefile

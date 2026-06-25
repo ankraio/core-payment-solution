@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "core-payment-solution.fullname" . }}-collector
+  labels:
+    {{- include "core-payment-solution.labels" . | nindent 4 }}
+    app.kubernetes.io/component: collector
+spec:
+  replicas: {{ .Values.collector.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "core-payment-solution.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: collector
+  template:
+    metadata:
+      labels:
+        {{- include "core-payment-solution.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: collector
+    spec:
+      serviceAccountName: {{ include "core-payment-solution.serviceAccountName" . }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: collector
+          image: {{ include "core-payment-solution.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/app/collector"]
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: ingest
+              containerPort: {{ .Values.collector.service.ingestPort }}
+              protocol: TCP
+            - name: dashboard
+              containerPort: {{ .Values.collector.service.dashboardPort }}
+              protocol: TCP
+          env:
+            - name: HONEYPOT_CONFIG
+              value: /app/config/honeypot.yaml
+            - name: INGEST_ADDRESS
+              value: ":{{ .Values.collector.service.ingestPort }}"
+            - name: DASHBOARD_ADDRESS
+              value: ":{{ .Values.collector.service.dashboardPort }}"
+            - name: DATA_DIRECTORY
+              value: /var/lib/honeypot
+            - name: LOG_LEVEL
+              value: {{ .Values.commonEnv.logLevel | quote }}
+            - name: DASHBOARD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "core-payment-solution.secretName" . }}
+                  key: {{ include "core-payment-solution.dashboardSecretKey" . }}
+            {{- if .Values.notifications.slack.enabled }}
+            - name: SLACK_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "core-payment-solution.secretName" . }}
+                  key: {{ include "core-payment-solution.slackSecretKey" . }}
+                  optional: true
+            {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+              readOnly: true
+            - name: data
+              mountPath: /var/lib/honeypot
+          resources:
+            {{- toYaml .Values.collector.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "core-payment-solution.fullname" . }}-config
+        - name: data
+          {{- if .Values.collector.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "core-payment-solution.fullname" . }}-collector
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.collector.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.collector.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.collector.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,160 @@
+# Core Payment Solution - deception stack.
+#
+# Portable bridge-network layout (works on macOS dev and Linux). On a Linux
+# deployment target, apply docker-compose.linux.yml as an override to switch the
+# trap services to host networking so emulators observe real client IPs:
+#   docker compose -f docker-compose.yml -f docker-compose.linux.yml up -d
+#
+# The packet sensor (Tier-2) lives behind the "sensor" profile and only runs on
+# Linux with host networking:  docker compose --profile sensor up -d sensor
+
+x-emulator-env: &emulator-env
+  COLLECTOR_URL: "http://collector:9400"
+  CERT_DIRECTORY: "/tmp/certs"
+  LOG_LEVEL: "info"
+  TRUST_FORWARDED_FOR: "${TRUST_FORWARDED_FOR:-false}"
+
+x-emulator: &emulator
+  image: core-payment-solution:latest
+  build:
+    context: .
+    dockerfile: Dockerfile
+  restart: unless-stopped
+  depends_on: [collector]
+  networks: [payments-internal]
+
+services:
+  collector:
+    image: core-payment-solution:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["/app/collector"]
+    restart: unless-stopped
+    networks: [payments-internal]
+    environment:
+      INGEST_ADDRESS: ":9400"
+      DASHBOARD_ADDRESS: ":9500"
+      DATA_DIRECTORY: "/var/lib/honeypot"
+      DASHBOARD_TOKEN: "${DASHBOARD_TOKEN:-change-me-operator-token}"
+      SLACK_WEBHOOK_URL: "${SLACK_WEBHOOK_URL:-}"
+      LOG_LEVEL: "info"
+    volumes:
+      - honeypot-data:/var/lib/honeypot
+    ports:
+      # Operator dashboard + ingest are bound to host loopback only.
+      - "127.0.0.1:9500:9500"
+      - "127.0.0.1:9400:9400"
+
+  ssh-emu:
+    <<: *emulator
+    command: ["/app/ssh-emu"]
+    environment:
+      <<: *emulator-env
+      MACHINE: "payments-api-01"
+    ports:
+      - "2222:2222"
+
+  tomcat-emu:
+    <<: *emulator
+    command: ["/app/tomcat-emu"]
+    environment:
+      <<: *emulator-env
+      MACHINE: "legacy-tomcat-01"
+    ports:
+      - "8080:8080"
+
+  jdwp-emu:
+    <<: *emulator
+    command: ["/app/jdwp-emu"]
+    environment:
+      <<: *emulator-env
+      MACHINE: "payments-api-01"
+    ports:
+      - "8000:8000"
+
+  payments-api-emu:
+    <<: *emulator
+    command: ["/app/payments-api-emu"]
+    environment:
+      <<: *emulator-env
+      MACHINE: "payments-api-01"
+    ports:
+      - "8443:8443"
+
+  admin-portal-emu:
+    <<: *emulator
+    command: ["/app/admin-portal-emu"]
+    environment:
+      <<: *emulator-env
+      MACHINE: "gateway-01"
+    ports:
+      - "8081:8081"
+
+  redis-emu:
+    <<: *emulator
+    command: ["/app/redis-emu"]
+    environment:
+      <<: *emulator-env
+      MACHINE: "cache-01"
+    ports:
+      - "6379:6379"
+
+  k8s-emu:
+    <<: *emulator
+    command: ["/app/k8s-emu"]
+    environment:
+      <<: *emulator-env
+      MACHINE: "k8s-control-01"
+    ports:
+      - "6443:6443"
+
+  ajp-emu:
+    <<: *emulator
+    command: ["/app/ajp-emu"]
+    profiles: ["tier2"]
+    environment:
+      <<: *emulator-env
+      MACHINE: "legacy-tomcat-01"
+    ports:
+      - "8009:8009"
+
+  kubelet-emu:
+    <<: *emulator
+    command: ["/app/kubelet-emu"]
+    profiles: ["tier2"]
+    environment:
+      <<: *emulator-env
+      MACHINE: "k8s-worker-01"
+    ports:
+      - "10250:10250"
+
+  etcd-emu:
+    <<: *emulator
+    command: ["/app/etcd-emu"]
+    profiles: ["tier2"]
+    environment:
+      <<: *emulator-env
+      MACHINE: "k8s-control-01"
+    ports:
+      - "2379:2379"
+
+  sensor:
+    build:
+      context: .
+      dockerfile: Dockerfile.sensor
+    profiles: ["sensor"]
+    restart: unless-stopped
+    network_mode: host
+    cap_add: [NET_RAW, NET_ADMIN]
+    environment:
+      COLLECTOR_URL: "http://127.0.0.1:9400"
+      SENSOR_INTERFACE: "${SENSOR_INTERFACE:-eth0}"
+      LOG_LEVEL: "info"
+
+networks:
+  payments-internal:
+    driver: bridge
+
+volumes:
+  honeypot-data:

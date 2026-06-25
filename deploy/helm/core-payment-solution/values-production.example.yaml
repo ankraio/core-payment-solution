@@ -1,0 +1,39 @@
+# Example production overrides — copy and customize:
+#   helm upgrade --install honeypot ./deploy/helm/core-payment-solution \
+#     -f deploy/helm/core-payment-solution/values-production.example.yaml \
+#     --set notifications.slack.webhookUrl='https://hooks.slack.com/services/T.../B.../...'
+
+image:
+  tag: "0.1.0"
+
+notifications:
+  slack:
+    enabled: true
+    webhookUrl: ""  # REQUIRED: your Slack incoming webhook URL
+    channel: "#security-alerts"
+
+secrets:
+  dashboardToken: ""  # REQUIRED: operator dashboard token
+
+tier2:
+  enabled: true
+
+emulators:
+  ajp:
+    enabled: true
+  kubelet:
+    enabled: true
+  etcd:
+    enabled: true
+
+sensor:
+  enabled: true
+  interface: eth0
+
+commonEnv:
+  trustForwardedFor: false
+
+collector:
+  persistence:
+    enabled: true
+    size: 20Gi

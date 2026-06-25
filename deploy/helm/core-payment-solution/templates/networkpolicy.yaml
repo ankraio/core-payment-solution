@@ -1,0 +1,52 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "core-payment-solution.fullname" . }}-collector-egress
+  labels:
+    {{- include "core-payment-solution.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "core-payment-solution.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: collector
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - ports:
+        - port: 443
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "core-payment-solution.fullname" . }}-emulator-egress
+  labels:
+    {{- include "core-payment-solution.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "core-payment-solution.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: emulator
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "core-payment-solution.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: collector
+      ports:
+        - port: {{ .Values.collector.service.ingestPort }}
+          protocol: TCP
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+{{- end }}

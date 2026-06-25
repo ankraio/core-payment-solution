@@ -1,0 +1,15 @@
+# Separate CGO/libpcap image for the Tier-2 packet sensor (Linux host networking).
+FROM golang:1.26-alpine AS builder
+RUN apk add --no-cache build-base libpcap-dev
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+ENV CGO_ENABLED=1 GOOS=linux
+RUN go build -trimpath -o /out/sensor ./cmd/sensor
+
+FROM alpine:3.20
+RUN apk add --no-cache libpcap
+COPY --from=builder /out/sensor /app/sensor
+WORKDIR /app
+ENTRYPOINT ["/app/sensor"]

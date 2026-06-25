@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+  docker-build:
+    name: Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build emulator image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          load: true
+          tags: core-payment-solution:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build sensor image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.sensor
+          push: false
+          load: true
+          tags: core-payment-solution-sensor:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  helm:
+    name: Helm lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Lint chart
+        run: helm lint deploy/helm/core-payment-solution
+
+      - name: Template chart
+        run: |
+          helm template honeypot deploy/helm/core-payment-solution \
+            --set notifications.slack.webhookUrl='https://hooks.slack.com/services/example' \
+            --set secrets.dashboardToken='ci-test-token' \
+            > /dev/null
+
+      - name: Validate tier2 template
+        run: |
+          helm template honeypot deploy/helm/core-payment-solution \
+            --set notifications.slack.webhookUrl='https://hooks.slack.com/services/example' \
+            --set secrets.dashboardToken='ci-test-token' \
+            --set tier2.enabled=true \
+            --set sensor.enabled=true \
+            > /dev/null
